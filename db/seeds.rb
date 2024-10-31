@@ -5,3 +5,4 @@
 #
 #   movies = Movie.create([{ name: "Star Wars" }, { name: "Lord of the Rings" }])
 #   Character.create(name: "Luke", movie: movies.first)
+Stock.create(symbol: "AAPL", company_name: "Apple Inc.", sector: "Technology", industry: "Consumer Electronics")
