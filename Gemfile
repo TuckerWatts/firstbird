@@ -18,6 +18,9 @@ gem "bootsnap", require: false
 gem 'devise'
 gem 'httparty'
 gem 'whenever', require: false
+gem 'chartkick'
+gem 'groupdate'
+gem 'highcharts'
 
 # Use Sass to process CSS
 # gem "sassc-rails"
