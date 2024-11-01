@@ -1,0 +1,9 @@
+<h1>Stocks</h1>
+
+<ul>
+  <% @stocks.each do |stock| %>
+    <li>
+      <%= link_to "#{stock.symbol} - #{stock.company_name}", stock_path(stock) %>
+    </li>
+  <% end %>
+</ul>

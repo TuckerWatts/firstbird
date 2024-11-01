@@ -4,7 +4,8 @@ class StockDataFetcher
 
   def initialize(stock_symbol)
     @stock_symbol = stock_symbol
-    @api_key = ENV['ALPHA_VANTAGE_API_KEY']
+    @api_key = Rails.application.credentials.dig(:alpha_vantage, :api_key)
+
   end
 
   def fetch_daily_adjusted

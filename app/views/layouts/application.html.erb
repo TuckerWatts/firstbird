@@ -9,11 +9,20 @@
 
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+
+    <%= javascript_include_tag 'application', 'data-turbolinks-track': 'reload' %>
+    <%= javascript_include_tag "//code.highcharts.com/highcharts.js" %>
   </head>
 
   <body>
     <main class="container mx-auto mt-28 px-5 flex">
       <%= yield %>
+
+      <% if user_signed_in? %>
+        <p>Signed in as <%= current_user.email %>. <%= link_to 'Sign out', destroy_user_session_path, method: :delete %></p>
+      <% else %>
+        <p><%= link_to 'Sign In', new_user_session_path %> or <%= link_to 'Sign Up', new_user_registration_path %></p>
+      <% end %>
     </main>
   </body>
 </html>
