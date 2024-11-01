@@ -21,6 +21,8 @@ gem 'whenever', require: false
 gem 'chartkick'
 gem 'groupdate'
 gem 'highcharts'
+gem 'sass-rails', '>= 6'
+gem 'bootstrap', '~> 5.0.0'
 
 # Use Sass to process CSS
 # gem "sassc-rails"
