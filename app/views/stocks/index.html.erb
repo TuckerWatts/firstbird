@@ -1,5 +1,15 @@
 <h1>Stocks</h1>
 
+<% if notice %>
+  <p class="alert alert-success"><%= notice %></p>
+<% end %>
+
+<%= link_to 'Home', root_path, class: 'btn btn-secondary' %>
+
+<% if user_signed_in? && current_user.admin? %>
+  <%= button_to 'Fetch Data', fetch_data_path, method: :post, data: { confirm: 'Are you sure you want to fetch new data? This may take some time.' }, class: 'btn btn-primary' %>
+<% end %>
+
 <ul>
   <% @stocks.each do |stock| %>
     <li>
