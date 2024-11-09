@@ -342,6 +342,7 @@ DEPENDENCIES
   redis (~> 4.0)
   rspec-rails
   sass-rails (>= 6)
+  sassc-rails
   selenium-webdriver
   sidekiq
   sprockets-rails
