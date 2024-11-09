@@ -1,10 +1,10 @@
 # Clear existing data to avoid duplication
-Stock.destroy_all
 HistoricalPrice.destroy_all
+Stock.destroy_all
 
-# Create sample stocks
-apple = Stock.create(symbol: "AAPL", company_name: "Apple Inc.", sector: "Technology", industry: "Consumer Electronics")
-tesla = Stock.create(symbol: "TSLA", company_name: "Tesla Inc.", sector: "Automotive", industry: "Electric Vehicles")
+# Now proceed with seeding Stocks and HistoricalPrices
+apple = Stock.create!(symbol: "AAPL", company_name: "Apple Inc.", sector: "Technology", industry: "Consumer Electronics")
+tesla = Stock.create!(symbol: "TSLA", company_name: "Tesla Inc.", sector: "Automotive", industry: "Electric Vehicles")
 
 # Helper to generate random historical prices for each stock
 def generate_historical_prices(stock, start_date, days)
