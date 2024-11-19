@@ -25,6 +25,7 @@ gem 'sass-rails', '>= 6'
 gem 'sassc-rails'
 gem 'bootstrap', '~> 5.0.0'
 gem 'finnhub_ruby', '~> 1.1'
+gem 'whenever', require: false
 
 # Use Sass to process CSS
 # gem "sassc-rails"
