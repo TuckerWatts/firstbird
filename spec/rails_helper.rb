@@ -46,6 +46,9 @@ RSpec.configure do |config|
   # Include Devise test helpers for controller specs
   config.include Devise::Test::ControllerHelpers, type: :controller
 
+  # Include Devise test helpers in request specs
+  config.include Devise::Test::IntegrationHelpers, type: :request
+
   config.include FactoryBot::Syntax::Methods
 
   # You can uncomment this line to turn off ActiveRecord support entirely.

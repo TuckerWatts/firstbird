@@ -7,13 +7,46 @@
 <%= link_to 'Home', root_path, class: 'btn btn-secondary' %>
 
 <% if user_signed_in? && current_user.admin? %>
-  <%= button_to 'Fetch Data', fetch_data_path, method: :post, data: { confirm: 'Are you sure you want to fetch new data? This may take some time.' }, class: 'btn btn-primary' %>
+  <%= button_to 'Fetch Data', fetch_data_path, method: :post, class: 'btn btn-primary' %>
 <% end %>
 
-<ul>
-  <% @stocks.each do |stock| %>
-    <li>
-      <%= link_to "#{stock.symbol} - #{stock.company_name}", stock_path(stock) %>
-    </li>
-  <% end %>
-</ul>
+<h1>Stocks</h1>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Symbol</th>
+      <th>Company Name</th>
+      <th>Predicted Price</th>
+      <th>Last Close Price</th>
+      <th>Prediction Success</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @stocks.each do |stock| %>
+      <tr>
+        <td><%= link_to stock.symbol, stock_path(stock) %></td>
+        <td><%= stock.company_name %></td>
+        <% if stock.previous_prediction %>
+          <td><%= number_to_currency(stock.previous_prediction.predicted_price) %></td>
+          <td><%= number_to_currency(stock.previous_prediction.actual_price) %></td>
+          <td>
+            <% if stock.prediction_successful? == true %>
+              <span class="text-success">Successful</span>
+            <% elsif stock.prediction_successful? == false %>
+              <span class="text-danger">Unsuccessful</span>
+            <% else %>
+              <span class="text-warning">Insufficient Data</span>
+            <% end %>
+          </td>
+        <% else %>
+          <td colspan="3">No prediction data available</td>
+        <% end %>
+        <td>
+          <%= link_to 'Show', stock_path(stock), class: 'btn btn-primary btn-sm' %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

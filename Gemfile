@@ -24,6 +24,7 @@ gem 'highcharts'
 gem 'sass-rails', '>= 6'
 gem 'sassc-rails'
 gem 'bootstrap', '~> 5.0.0'
+gem 'finnhub_ruby', '~> 1.1'
 
 # Use Sass to process CSS
 # gem "sassc-rails"
@@ -41,6 +42,7 @@ end
 
 group :development do
   gem "web-console"
+  gem "bullet"
 end
 
 group :test do

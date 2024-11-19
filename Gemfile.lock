@@ -81,6 +81,9 @@ GEM
       popper_js (>= 2.9.2, < 3)
       sassc-rails (>= 2.0.0)
     builder (3.3.0)
+    bullet (8.0.0)
+      activesupport (>= 3.0.0)
+      uniform_notifier (~> 1.11)
     capybara (3.40.0)
       addressable
       matrix
@@ -112,6 +115,8 @@ GEM
       warden (~> 1.2.3)
     diff-lcs (1.5.1)
     erubi (1.13.0)
+    ethon (0.16.0)
+      ffi (>= 1.15.0)
     execjs (2.10.0)
     factory_bot (6.5.0)
       activesupport (>= 5.0.0)
@@ -122,6 +127,8 @@ GEM
       i18n (>= 1.8.11, < 2)
     ffi (1.17.0-arm64-darwin)
     ffi (1.17.0-x86_64-linux-gnu)
+    finnhub_ruby (1.1.19)
+      typhoeus (~> 1.0, >= 1.0.1)
     globalid (1.2.1)
       activesupport (>= 6.1)
     groupdate (6.5.1)
@@ -294,8 +301,11 @@ GEM
     turbo-rails (2.0.11)
       actionpack (>= 6.0.0)
       railties (>= 6.0.0)
+    typhoeus (1.4.1)
+      ethon (>= 0.9.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
+    uniform_notifier (1.16.0)
     warden (1.2.9)
       rack (>= 2.0.9)
     web-console (4.2.1)
@@ -324,12 +334,14 @@ PLATFORMS
 DEPENDENCIES
   bootsnap
   bootstrap (~> 5.0.0)
+  bullet
   capybara
   chartkick
   debug
   devise
   factory_bot_rails
   faker
+  finnhub_ruby (~> 1.1)
   groupdate
   highcharts
   httparty

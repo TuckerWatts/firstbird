@@ -1,20 +1,19 @@
 class FetchStockDataJob < ApplicationJob
   queue_as :default
 
-  def perform(stock_id)
-    stock = Stock.find(stock_id)
-    fetcher = StockDataFetcher.new(stock.symbol)
-    historical_prices = fetcher.fetch_daily_adjusted
+  def perform(stock_id = nil)
+    stocks = stock_id ? [Stock.find(stock_id)] : Stock.all
 
-    return unless historical_prices
+    stocks.each do |stock|
+      fetcher = StockDataFetcher.new(stock.symbol)
+      data = fetcher.fetch_recent_data
 
-    historical_prices.each do |price_data|
-      stock.historical_prices.find_or_create_by(date: price_data[:date]) do |hp|
-        hp.open = price_data[:open]
-        hp.high = price_data[:high]
-        hp.low = price_data[:low]
-        hp.close = price_data[:close]
-        hp.volume = price_data[:volume]
+      if data.is_a?(Hash)
+        current_price = data[:current_price]
+        # Update the stock's latest_price attribute
+        stock.update(latest_price: current_price)
+      else
+        Rails.logger.error "Failed to fetch data for #{stock.symbol}"
       end
     end
   end

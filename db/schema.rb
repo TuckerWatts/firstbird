@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_09_020027) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_13_015746) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -34,6 +34,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_09_020027) do
     t.string "prediction_method"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "actual_price"
     t.index ["stock_id"], name: "index_predictions_on_stock_id"
   end
 
@@ -44,6 +45,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_09_020027) do
     t.string "industry"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "latest_price"
   end
 
   create_table "users", force: :cascade do |t|

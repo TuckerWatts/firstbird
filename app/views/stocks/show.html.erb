@@ -2,6 +2,34 @@
 
 <%= link_to 'Home', root_path, class: 'btn btn-secondary' %>
 
+<h2>Price Predictions</h2>
+
+<% if @previous_prediction %>
+  <h3>Previous Day's Prediction (<%= @previous_prediction.date.strftime('%Y-%m-%d') %>)</h3>
+  <table class="table">
+    <tr>
+      <th>Predicted Price</th>
+      <td><%= number_to_currency(@previous_prediction.predicted_price) %></td>
+    </tr>
+    <tr>
+      <th>Last close Price</th>
+      <td><%= number_to_currency(@previous_prediction.actual_price) %></td>
+    </tr>
+    <tr>
+      <th>Previous Day's Prediction</th>
+      <td>
+        <% if @prediction_successful == true %>
+          <p class="text-success"><strong>The prediction was successful!</strong></p>
+        <% elsif @prediction_successful == false %>
+          <p class="text-danger"><strong>The prediction was not successful.</strong></p>
+        <% else %>
+          <p class="text-warning"><strong>Not enough data to determine prediction success.</strong></p>
+        <% end %>
+      </td>
+    </tr>
+  </table>
+<% end %>
+
 <h2>Historical Prices</h2>
 
 <table>
@@ -12,7 +40,6 @@
       <th>High</th>
       <th>Low</th>
       <th>Close</th>
-      <th>Volume</th>
     </tr>
   </thead>
   <tbody>
@@ -23,37 +50,7 @@
         <td><%= number_to_currency(price.high) %></td>
         <td><%= number_to_currency(price.low) %></td>
         <td><%= number_to_currency(price.close) %></td>
-        <td><%= number_with_delimiter(price.volume) %></td>
       </tr>
     <% end %>
   </tbody>
 </table>
-
-<h2>Predictions</h2>
-
-<table>
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Predicted Price</th>
-      <th>Method</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% @predictions.each do |prediction| %>
-      <tr>
-        <td><%= prediction.date %></td>
-        <td><%= number_to_currency(prediction.predicted_price) %></td>
-        <td><%= prediction.prediction_method %></td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
-
-<h2>Price Chart</h2>
-
-<%= line_chart @historical_prices.map { |p| [p.date, p.close] }, height: '500px', library: { title: { text: 'Closing Prices' } } %>
-
-<h2>Predicted Prices</h2>
-
-<%= line_chart @predictions.map { |p| [p.date, p.predicted_price] }, height: '500px', library: { title: { text: 'Predicted Prices' } } %>
