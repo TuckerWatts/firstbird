@@ -30,22 +30,28 @@ class StockDataFetcher
   end
 
   def fetch_historical_prices(days)
-    response = self.class.get("/historical-price-full/#{@stock_symbol}", query: {
-      serietype: 'line',
-      timeseries: days,
+    response = self.class.get('/time_series', query: {
+      symbol: @stock_symbol,
+      interval: '1day',
+      outputsize: days,
       apikey: @api_key
     })
 
-    if response.success? && response.parsed_response.is_a?(Hash) && response.parsed_response['historical'].is_a?(Array)
-      data = response.parsed_response['historical']
+    if response.success? && response.parsed_response['status'] != 'error'
+      data = response.parsed_response['values']
       data.map do |entry|
         {
-          date: Date.parse(entry['date']),
-          close_price: entry['close'].to_f
+          date: Date.parse(entry['datetime']),
+          open: entry['open'].to_f,
+          high: entry['high'].to_f,
+          low: entry['low'].to_f,
+          close: entry['close'].to_f,
+          volume: entry['volume'].to_i
         }
       end
     else
-      Rails.logger.error "Failed to fetch historical data for #{@stock_symbol}"
+      error_message = response.parsed_response['message'] || "HTTP #{response.code}"
+      Rails.logger.error "Failed to fetch historical data for #{@stock_symbol}: #{error_message}"
       []
     end
   end

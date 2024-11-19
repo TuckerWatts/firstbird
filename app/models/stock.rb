@@ -29,4 +29,12 @@ class Stock < ApplicationRecord
 
     (predicted_direction * actual_direction) > 0
   end
+
+  def moving_average(days)
+    prices = historical_prices.where('date <= ?', Date.today).order(date: :desc).limit(days)
+    return nil if prices.size < days
+
+    total = prices.sum(:close)
+    (total / days).round(2)
+  end
 end

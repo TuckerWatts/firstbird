@@ -21,6 +21,10 @@
 
 set :output, "log/cron.log"
 
-every 1.day, at: '2:00 am' do
-  rake "stocks:fetch_data"
+# every 1.day, at: '2:00 am' do
+#   rake "stocks:fetch_data"
+# end
+
+every 1.day, at: '2:15 am' do
+  runner "FetchStockDataJob.perform_now"
 end

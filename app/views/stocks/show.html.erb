@@ -1,6 +1,20 @@
 <h1><%= @stock.company_name %> (<%= @stock.symbol %>)</h1>
+<p>Latest Price: <%= number_to_currency(@stock.latest_price) %></p>
 
 <%= link_to 'Home', root_path, class: 'btn btn-secondary' %>
+
+<h2>Predictions for <%= Date.today.strftime("%B %d, %Y") %></h2>
+<% prediction = @stock.predictions.find_by(date: Date.today) %>
+<% if prediction %>
+  <ul>
+    <li>5-Day Moving Average: <%= number_to_currency(prediction.ma_5) %></li>
+    <li>10-Day Moving Average: <%= number_to_currency(prediction.ma_10) %></li>
+    <li>20-Day Moving Average: <%= number_to_currency(prediction.ma_20) %></li>
+  </ul>
+  <p>Actual Price: <%= number_to_currency(prediction.actual_price) %></p>
+<% else %>
+  <p>No predictions available for today.</p>
+<% end %>
 
 <h2>Price Predictions</h2>
 
