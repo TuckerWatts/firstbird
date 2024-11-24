@@ -14,11 +14,21 @@ class StockPredictor
 
     # Exclude the latest day if it's today (market may not have closed yet)
     if sorted_data.first[:date] == Date.today
-      prices = sorted_data[1..days].map { |data| data[:close_price] }
+      relevant_data = sorted_data[1..days]
     else
-      prices = sorted_data[0...days].map { |data| data[:close_price] }
+      relevant_data = sorted_data[0...days]
     end
 
+    # Extract close prices using the correct key :close
+    prices = relevant_data.map { |data| data[:close] }.compact
+
+    # Ensure we have enough valid prices
+    if prices.size < days
+      Rails.logger.error "Not enough valid close prices for #{@stock.symbol}. Required: #{days}, Available: #{prices.size}"
+      return nil
+    end
+
+    # Calculate average price
     average_price = prices.sum / days.to_f
 
     prediction_date = Date.today
@@ -30,8 +40,10 @@ class StockPredictor
 
     prediction.predicted_price = average_price
 
-    # Set actual_price with the previous close price
-    prediction.actual_price = sorted_data.first[:close_price]
+    # Set actual_price with the latest available close price
+    prediction.actual_price = sorted_data.first[:close]
+
+    prediction.prediction_date = Date.tomorrow
 
     prediction.save!
   end

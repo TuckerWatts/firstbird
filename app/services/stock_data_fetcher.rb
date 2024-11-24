@@ -12,8 +12,10 @@ class StockDataFetcher
       apikey: @api_key
     })
 
-    if response.success? && response.parsed_response.is_a?(Array) && response.parsed_response.any?
-      data = response.parsed_response.first
+    parsed_response = response.parsed_response
+
+    if response.success? && parsed_response.is_a?(Array) && parsed_response.any?
+      data = parsed_response.first
 
       {
         current_price: data['price'].to_f,
@@ -24,34 +26,41 @@ class StockDataFetcher
         timestamp: Time.at(data['timestamp'].to_i)
       }
     else
-      Rails.logger.error "Failed to fetch data for #{@stock_symbol}"
+      error_message = parsed_response.is_a?(Hash) ? parsed_response['Error Message'] || parsed_response['message'] : "Invalid response format"
+      Rails.logger.error "Failed to fetch recent data for #{@stock_symbol}: #{error_message}"
       nil
     end
   end
 
   def fetch_historical_prices(days)
-    response = self.class.get('/time_series', query: {
-      symbol: @stock_symbol,
-      interval: '1day',
-      outputsize: days,
+    response = self.class.get("/historical-price-full/#{@stock_symbol}", query: {
+      timeseries: days,
       apikey: @api_key
     })
 
-    if response.success? && response.parsed_response['status'] != 'error'
-      data = response.parsed_response['values']
-      data.map do |entry|
-        {
-          date: Date.parse(entry['datetime']),
-          open: entry['open'].to_f,
-          high: entry['high'].to_f,
-          low: entry['low'].to_f,
-          close: entry['close'].to_f,
-          volume: entry['volume'].to_i
-        }
+    parsed_response = response.parsed_response
+
+    if response.success? && parsed_response.is_a?(Hash) && parsed_response['historical']
+      data = parsed_response['historical']
+
+      if data.is_a?(Array)
+        data.map do |entry|
+          {
+            date: Date.parse(entry['date']),
+            open: entry['open'].to_f,
+            high: entry['high'].to_f,
+            low: entry['low'].to_f,
+            close: entry['close'].to_f, # Key is :close
+            volume: entry['volume'].to_i
+          }
+        end
+      else
+        Rails.logger.error "Expected 'historical' to be an Array, got #{data.class}. Response: #{parsed_response.inspect}"
+        []
       end
     else
-      error_message = response.parsed_response['message'] || "HTTP #{response.code}"
-      Rails.logger.error "Failed to fetch historical data for #{@stock_symbol}: #{error_message}"
+      error_message = parsed_response.is_a?(Hash) ? parsed_response['Error Message'] || parsed_response['message'] : "Invalid response format"
+      Rails.logger.error "Failed to fetch historical data for #{@stock_symbol}: #{error_message}. Response: #{parsed_response.inspect}"
       []
     end
   end

@@ -35,14 +35,19 @@ class FetchStockDataJob < ApplicationJob
   private
 
   def calculate_and_store_predictions(stock)
-    prediction = stock.predictions.find_or_initialize_by(date: Date.today)
-    prediction.prediction_method = 'Moving Averages'
+    future_dates = [
+      Date.tomorrow,
+      Date.today + 7.days,
+      Date.today + 1.month,
+      Date.today + 3.months
+    ]
 
-    # Calculate moving averages
-    prediction.ma_5 = stock.moving_average(5)
-    prediction.ma_10 = stock.moving_average(10)
-    prediction.ma_20 = stock.moving_average(20)
-    prediction.actual_price = stock.latest_price
-    prediction.save
+    future_dates.each do |target_date|
+      prediction = stock.predictions.find_or_initialize_by(prediction_date: target_date, date: Date.today)
+      prediction.prediction_method = 'Moving Averages'
+      prediction.predicted_price = stock.calculate_future_prediction(target_date)
+      prediction.actual_price = nil
+      prediction.save!
+    end
   end
 end

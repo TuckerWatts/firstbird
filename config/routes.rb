@@ -7,7 +7,12 @@ Rails.application.routes.draw do
 
   devise_for :users
 
-  resources :stocks, only: [:index, :show]
+  resources :stocks do
+    collection do
+      post :run_predictions
+      post :refresh_top_stocks
+    end
+  end
 
   post 'fetch_data', to: 'data#fetch_data', as: 'fetch_data'
 end

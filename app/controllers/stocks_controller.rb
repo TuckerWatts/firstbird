@@ -1,44 +1,42 @@
 class StocksController < ApplicationController
 
   def index
-    @stocks = Stock.includes(:predictions)
+    @stocks = Stock.includes(:predictions).all
+
+    # Show the button if any stock lacks today's predictions
+    today_predictions_count = Prediction.where(date: Date.today).distinct.count(:stock_id)
+    @show_run_predictions_button = today_predictions_count < @stocks.count
+    @top_stocks = TopStock.includes(stock: :predictions).map(&:stock)
   end
 
   def show
     @stock = Stock.find(params[:id])
+    @latest_prediction = @stock.latest_prediction
+    @prediction_successful = @stock.last_prediction_successful?
+    @moving_average_5 = @stock.moving_average(5)
+    @moving_average_10 = @stock.moving_average(10)
+    @moving_average_20 = @stock.moving_average(20)
+    @historical_prices = @stock.historical_prices.order(date: :desc).limit(5)
+    # Get today's prediction
+    @today_prediction = @stock.predictions.find_by(date: Date.today)
+    # Determine whether to show the run predictions button
+    @show_run_predictions_button = @today_prediction.nil?
 
-    @historical_prices = @stock.historical_prices.order(date: :desc).limit(100)
-
-    @latest_prediction = @stock.predictions.order(date: :desc).first
-
-    if @latest_prediction
-      # Fetch the previous day's prediction
-      @previous_prediction = @stock.predictions.where("date < ?", @latest_prediction.date).order(date: :desc).first
-
-      # Determine if the previous prediction was successful
-      if @previous_prediction
-        @prediction_successful = prediction_successful?(@previous_prediction)
-      else
-        @prediction_successful = nil
-      end
-    else
-      # No predictions available
-      @previous_prediction = nil
-      @prediction_successful = nil
-    end
+    @call_option_recommendations = @stock.call_option_recommendations
   end
 
-  private
+  def refresh_top_stocks
+    fetcher = TopStocksFetcher.new
+    top_stocks = fetcher.fetch_top_meme_stocks
 
-  def prediction_successful?(prediction)
-    previous_prediction = @stock.predictions.where("date <= ?", prediction.date).order(date: :desc).first
+    # Clear existing top stocks
+    TopStock.delete_all
 
-    if previous_prediction && prediction.actual_price && previous_prediction.actual_price
-      predicted_direction = prediction.predicted_price - previous_prediction.actual_price
-      actual_direction = prediction.actual_price - previous_prediction.actual_price
-      (predicted_direction * actual_direction) > 0
-    else
-      nil
+    # Save new top stocks
+    top_stocks.each do |stock|
+      TopStock.create(stock: stock)
     end
+
+    redirect_to stocks_path, notice: 'Top stocks have been refreshed.'
   end
 end

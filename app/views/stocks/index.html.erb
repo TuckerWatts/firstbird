@@ -8,9 +8,43 @@
 
 <% if user_signed_in? && current_user.admin? %>
   <%= button_to 'Fetch Data', fetch_data_path, method: :post, class: 'btn btn-primary' %>
+  <%= button_to 'Refresh Top Stocks', refresh_top_stocks_stocks_path, method: :post, class: 'btn btn-primary' %>
 <% end %>
 
-<h1>Stocks</h1>
+<h2>Top 5 Meme Stocks</h2>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Symbol</th>
+      <th>Company Name</th>
+      <th>Predicted Price Increase (%)</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @top_stocks.each do |stock| %>
+      <% latest_prediction = stock.predictions.order(prediction_date: :desc).first %>
+      <% if latest_prediction && stock.latest_price %>
+        <% price_increase = ((latest_prediction.predicted_price - stock.latest_price) / stock.latest_price) * 100 %>
+        <tr>
+          <td><%= link_to stock.symbol, stock_path(stock) %></td>
+          <td><%= stock.company_name %></td>
+          <td><%= number_to_percentage(price_increase, precision: 2) %></td>
+          <td>
+            <%= link_to 'Show', stock_path(stock), class: 'btn btn-primary btn-sm' %>
+          </td>
+        </tr>
+      <% else %>
+        <tr>
+          <td><%= link_to stock.symbol, stock_path(stock) %></td>
+          <td><%= stock.company_name %></td>
+          <td colspan="2">No prediction data available</td>
+        </tr>
+      <% end %>
+    <% end %>
+  </tbody>
+</table>
 
 <table class="table">
   <thead>
@@ -18,23 +52,26 @@
       <th>Symbol</th>
       <th>Company Name</th>
       <th>Predicted Price</th>
-      <th>Last Close Price</th>
+      <th>Actual Price</th>
       <th>Prediction Success</th>
-      <th>Actions</th>
+      <th>Call Option Recommendation</th>
     </tr>
   </thead>
   <tbody>
     <% @stocks.each do |stock| %>
+    <% recommendations = stock.call_option_recommendations %>
+    <% best_timeframe = recommendations.select { |_, advisable| advisable }.keys.first %>
       <tr>
         <td><%= link_to stock.symbol, stock_path(stock) %></td>
         <td><%= stock.company_name %></td>
-        <% if stock.previous_prediction %>
-          <td><%= number_to_currency(stock.previous_prediction.predicted_price) %></td>
-          <td><%= number_to_currency(stock.previous_prediction.actual_price) %></td>
+        <% if stock.latest_prediction %>
+          <td><%= number_to_currency(stock.latest_prediction.predicted_price) %></td>
+          <td><%= number_to_currency(stock.latest_prediction.actual_price) %></td>
           <td>
-            <% if stock.prediction_successful? == true %>
+            <% case stock.last_prediction_successful? %>
+            <% when true %>
               <span class="text-success">Successful</span>
-            <% elsif stock.prediction_successful? == false %>
+            <% when false %>
               <span class="text-danger">Unsuccessful</span>
             <% else %>
               <span class="text-warning">Insufficient Data</span>
@@ -43,9 +80,18 @@
         <% else %>
           <td colspan="3">No prediction data available</td>
         <% end %>
-        <td>
-          <%= link_to 'Show', stock_path(stock), class: 'btn btn-primary btn-sm' %>
-        </td>
+          <td>
+            <% if best_timeframe %>
+              <span class="text-success">
+                Buy call option for <%= best_timeframe %>
+              </span>
+            <% else %>
+              <span class="text-danger">No favorable timeframes currently</span>
+            <% end %>
+          </td>
+          <td>
+            <%= link_to 'Details', stock_path(stock), class: 'btn btn-primary btn-sm' %>
+          </td>
       </tr>
     <% end %>
   </tbody>

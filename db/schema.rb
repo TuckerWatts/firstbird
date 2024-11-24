@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_11_19_210320) do
+ActiveRecord::Schema[7.0].define(version: 2024_11_23_200359) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -39,6 +39,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_19_210320) do
     t.decimal "ma_5"
     t.decimal "ma_10"
     t.decimal "ma_20"
+    t.date "prediction_date"
     t.index ["stock_id"], name: "index_predictions_on_stock_id"
   end
 
@@ -50,6 +51,13 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_19_210320) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.decimal "latest_price"
+  end
+
+  create_table "top_stocks", force: :cascade do |t|
+    t.bigint "stock_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["stock_id"], name: "index_top_stocks_on_stock_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -67,4 +75,5 @@ ActiveRecord::Schema[7.0].define(version: 2024_11_19_210320) do
 
   add_foreign_key "historical_prices", "stocks"
   add_foreign_key "predictions", "stocks"
+  add_foreign_key "top_stocks", "stocks"
 end
