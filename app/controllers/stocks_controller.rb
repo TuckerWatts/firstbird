@@ -29,9 +29,6 @@ class StocksController < ApplicationController
     fetcher = TopStocksFetcher.new
     top_stocks = fetcher.fetch_top_meme_stocks
 
-    # Clear existing top stocks
-    TopStock.delete_all
-
     # Save new top stocks
     top_stocks.each do |stock|
       TopStock.create(stock: stock)
