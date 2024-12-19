@@ -1,84 +1,105 @@
 class TopStocksFetcher
-  include HTTParty
-  base_uri 'https://finnhub.io/api/v1'
-
   def initialize
     @api_key = Rails.application.credentials.dig(:finnhub, :api_key)
   end
 
   def fetch_top_meme_stocks
-    # Fetch the most active stocks
-    response = self.class.get('/stock_market/actives', query: {
-      apikey: @api_key
-    })
+    timeframe = Time.zone.today + 7.days  # Short-term prediction: 1 week
+    all_stocks = Stock.includes(:historical_prices, :predictions).to_a
 
-    if response.success?
-      stocks_data = response.parsed_response
-
-      # Find or create stocks based on the API response
-      stocks = stocks_data.map do |stock_data|
-        symbol = stock_data['symbol']
-        company_name = stock_data['name']
-
-        stock = Stock.find_or_create_by(symbol: symbol) do |s|
-          s.company_name = company_name
-        end
-
-        # Update latest price
-        stock.latest_price = stock_data['price'].to_f
-        stock.save!
-
-        stock
-      end
-
-      # Filter stocks to include only those with favorable recommendations for timeframes > 1 day
-      filtered_stocks = stocks.select do |stock|
-        # Ensure predictions are up-to-date
-        calculate_and_store_predictions(stock)
-
-        # Get call option recommendations excluding '1 Day'
-        timeframes = ['1 Week', '1 Month', '3 Months']
-        recommendations = stock.call_option_recommendations(timeframes)
-
-        # Select stocks with at least one favorable recommendation
-        recommendations.values.any? { |advisable| advisable }
-      end
-
-      # Return the top stocks (e.g., top 5)
-      filtered_stocks.first(5)
-    else
-      Rails.logger.error "Failed to fetch active stocks: #{response.message}"
-      []
+    # Ensure data is up-to-date for each stock
+    all_stocks.each do |stock|
+      update_stock_data(stock)
+      calculate_and_store_prediction(stock, timeframe)
     end
+
+    # Compute a composite "meme score" for each stock
+    scores = {}
+    all_stocks.each do |stock|
+      predicted_price = stock.calculate_future_prediction(timeframe)
+      scores[stock.id] = calculate_composite_score(stock, predicted_price, timeframe)
+    end
+
+    # Sort by composite score and pick top 5
+    top_stocks = all_stocks.sort_by { |stock| scores[stock.id] }.reverse.first(5)
+    top_stocks
   end
 
   private
 
-  def filter_meme_stocks(stocks)
-    # Implement logic to filter meme stocks based on criteria
-    # For simplicity, let's assume stocks with high volume and volatility are meme stocks
-    stocks.select do |stock|
-      # You can define your own criteria here
-      stock.latest_price.present? && stock.latest_price > 0
+  def update_stock_data(stock)
+    if stock.latest_price.nil?
+      stock.fetch_and_update_current_price rescue nil
+    end
+
+    if stock.historical_prices.empty?
+      stock.fetch_and_update_historical_prices rescue nil
     end
   end
 
-  def calculate_and_store_predictions(stock)
-    future_dates = {
-      '1 Week' => Time.zone.today + 7.days,
-      '1 Month' => Time.zone.today + 1.month,
-      '3 Months' => Time.zone.today + 3.months
-    }
+  def calculate_and_store_prediction(stock, target_date)
+    prediction = stock.predictions.find_or_initialize_by(
+      date: Time.zone.today,
+      prediction_date: target_date
+    )
+    prediction.prediction_method = 'Moving Averages'
+    predicted_price = stock.calculate_future_prediction(target_date)
+    prediction.predicted_price = predicted_price || 0.0
+    prediction.actual_price = nil
+    prediction.save!
+  end
 
-    future_dates.each do |timeframe, target_date|
-      prediction = stock.predictions.find_or_initialize_by(
-        date: Time.zone.today,
-        prediction_date: target_date
-      )
-      prediction.prediction_method = 'Moving Averages'
-      stock.calculate_future_prediction(target_date) ? prediction.predicted_price = stock.calculate_future_prediction(target_date) : prediction.predicted_price = 0.0
-      prediction.actual_price = nil
-      prediction.save!
-    end
+  def calculate_composite_score(stock, predicted_price, timeframe)
+    return -Float::INFINITY if predicted_price.nil? || stock.latest_price.nil?
+
+    # 1. Predicted Gain Percentage
+    predicted_gain = ((predicted_price - stock.latest_price) / stock.latest_price) * 100.0
+
+    # 2. Volatility: Based on recent price changes standard deviation
+    volatility = calculate_volatility(stock)
+
+    # 3. Volume Spike: Ratio of today's volume vs. average volume
+    volume_spike = calculate_volume_spike(stock)
+
+    # 4. ML Score: Assume stock has an ml_score attribute; default to 1.0 if none
+    ml_score = stock.ml_score || 1.0
+
+    # Composite score:
+    # Heuristics (example weights):
+    # - Predicted gain: 0.7 weight
+    # - Volatility: 0.2 weight (higher volatility = more meme-like)
+    # - Volume spike: 0.1 weight
+    # - Multiply result by ml_score as a factor
+
+    base_score = (predicted_gain * 0.7) + (volatility * 0.2) + (volume_spike * 0.1)
+    composite_score = base_score * ml_score
+    composite_score
+  end
+
+  def calculate_volatility(stock)
+    # Get recent close prices
+    closes = stock.historical_prices.order(date: :desc).limit(30).pluck(:close)
+    return 0.0 if closes.size < 2
+
+    daily_returns = closes.each_cons(2).map { |y, t| (t - y) / y * 100.0 }
+    mean = daily_returns.sum / daily_returns.size
+    variance = daily_returns.map { |r| (r - mean)**2 }.sum / daily_returns.size
+    stddev = Math.sqrt(variance)
+
+    # Higher stddev means more volatility
+    stddev
+  end
+
+  def calculate_volume_spike(stock)
+    volumes = stock.historical_prices.order(date: :desc).limit(30).pluck(:volume)
+    return 0.0 if volumes.empty?
+
+    today_volume = volumes.first
+    avg_volume = volumes.sum / volumes.size
+
+    return 0.0 if avg_volume == 0
+
+    # Volume spike ratio
+    (today_volume / avg_volume.to_f)
   end
 end
