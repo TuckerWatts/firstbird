@@ -12,6 +12,11 @@ class Stock < ApplicationRecord
     '3 Months' => 10.0
   }.freeze
 
+  # ml_score can be nil if not computed yet, default to 1.0 if nil
+  def ml_score
+    read_attribute(:ml_score) || 1.0
+  end
+
   # Returns a hash indicating whether buying a call option is advisable for each timeframe
   def call_option_recommendations(timeframes = THRESHOLDS.keys)
     recommendations = {}
