@@ -1,13 +1,72 @@
 class StocksController < ApplicationController
 
   def index
-    @stocks = Stock.includes(:predictions).all
+    timeframe = Time.zone.today + 1.month
 
-    # Show the button if any stock lacks today's predictions
-    today_predictions_count = Prediction.where(date: Date.today).distinct.count(:stock_id)
-    @show_run_predictions_button = today_predictions_count < @stocks.count
-    @top_stocks = TopStock.includes(stock: :predictions).map(&:stock)
+    # Preload all necessary data so no fetching is triggered during sorting
+    all_stocks = Stock.includes(:historical_prices, :predictions).to_a
+
+    # Ensure all stocks have latest_price updated and historical_prices present if needed
+    # But do this outside of sorting and prediction calculations
+    all_stocks.each do |stock|
+      # Only update if not present - avoid multiple calls
+      if stock.latest_price.nil?
+        stock.fetch_and_update_current_price rescue nil
+      end
+      if stock.historical_prices.empty?
+        stock.fetch_and_update_historical_prices rescue nil
+      end
+    end
+
+    # Precompute predictions once per stock to avoid repeated calls to calculate_future_prediction
+    predictions_map = {}
+    all_stocks.each do |stock|
+      predictions_map[stock.id] = stock.calculate_future_prediction(timeframe)
+    end
+
+    # Sort stocks by profitability using the precomputed predictions, select top 10
+    @stocks = all_stocks.sort_by do |stock|
+      predicted_price = predictions_map[stock.id]
+      if predicted_price && stock.latest_price
+        ((predicted_price - stock.latest_price) / stock.latest_price) * 100.0
+      else
+        -Float::INFINITY
+      end
+    end.reverse.first(10)
+
+    # Get today's prediction from the last stock in the sorted list (if available)
+    @today_prediction = @stocks.last&.predictions&.find_by(date: Date.today)
+    @show_run_predictions_button = @today_prediction.nil?
+
+    # Handle TopStocks similarly, but don't re-fetch data again
+    top_stocks_all = TopStock.includes(stock: [:historical_prices, :predictions]).map(&:stock)
+
+    # Update data for top stocks if necessary
+    top_stocks_all.each do |stock|
+      if stock.latest_price.nil?
+        stock.fetch_and_update_current_price rescue nil
+      end
+      if stock.historical_prices.empty?
+        stock.fetch_and_update_historical_prices rescue nil
+      end
+    end
+
+    # Precompute predictions for top stocks
+    top_predictions_map = {}
+    top_stocks_all.each do |stock|
+      top_predictions_map[stock.id] = stock.calculate_future_prediction(timeframe)
+    end
+
+    @top_stocks = top_stocks_all.sort_by do |stock|
+      predicted_price = top_predictions_map[stock.id]
+      if predicted_price && stock.latest_price
+        ((predicted_price - stock.latest_price) / stock.latest_price) * 100.0
+      else
+        -Float::INFINITY
+      end
+    end.reverse.first(10)
   end
+
 
   def show
     @stock = Stock.find(params[:id])
@@ -29,11 +88,17 @@ class StocksController < ApplicationController
     fetcher = TopStocksFetcher.new
     top_stocks = fetcher.fetch_top_meme_stocks
 
-    # Save new top stocks
-    top_stocks.each do |stock|
-      TopStock.create(stock: stock)
-    end
+    if top_stocks.any?
+      # Clear existing top stocks
+      TopStock.delete_all
 
-    redirect_to stocks_path, notice: 'Top stocks have been refreshed.'
+      top_stocks.each do |stock|
+        TopStock.create!(stock: stock)
+      end
+
+      redirect_to stocks_path, notice: 'Top stocks have been refreshed.'
+    else
+      redirect_to stocks_path, alert: 'No top stocks found with favorable call option recommendations.'
+    end
   end
 end

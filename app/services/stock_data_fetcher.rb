@@ -1,10 +1,10 @@
 class StockDataFetcher
   include HTTParty
-  base_uri 'https://financialmodelingprep.com/api/v3'
+  base_uri 'https://finnhub.io/api/v1'
 
   def initialize(stock_symbol)
     @stock_symbol = stock_symbol
-    @api_key = Rails.application.credentials.dig(:fmp, :api_key)
+    @api_key = Rails.application.credentials.dig(:finnhub, :api_key)
   end
 
   def fetch_recent_data

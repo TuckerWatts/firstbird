@@ -36,7 +36,6 @@ class FetchStockDataJob < ApplicationJob
 
   def calculate_and_store_predictions(stock)
     future_dates = [
-      Date.tomorrow,
       Date.today + 7.days,
       Date.today + 1.month,
       Date.today + 3.months

@@ -7,14 +7,13 @@ class Stock < ApplicationRecord
   validates :symbol, presence: true
 
   THRESHOLDS = {
-    '1 Day' => 1.0,
     '1 Week' => 3.0,
     '1 Month' => 5.0,
     '3 Months' => 10.0
   }.freeze
 
   # Returns a hash indicating whether buying a call option is advisable for each timeframe
-  def call_option_recommendations
+  def call_option_recommendations(timeframes = THRESHOLDS.keys)
     recommendations = {}
     current_price = latest_price
 
@@ -22,29 +21,29 @@ class Stock < ApplicationRecord
 
     # Check if predictions are preloaded
     if association(:predictions).loaded?
-      # Build a hash of predictions keyed by prediction_date
       predictions_by_date = predictions.index_by(&:prediction_date)
     else
       predictions_by_date = nil
     end
 
-    THRESHOLDS.each do |timeframe, threshold|
+    timeframes.each do |timeframe|
+      threshold = THRESHOLDS[timeframe]
+      next unless threshold
+
       prediction_date = case timeframe
                         when '1 Day'
-                          Date.tomorrow
+                          Time.zone.tomorrow
                         when '1 Week'
-                          Date.today + 7.days
+                          Time.zone.today + 7.days
                         when '1 Month'
-                          Date.today + 1.month
+                          Time.zone.today + 1.month
                         when '3 Months'
-                          Date.today + 3.months
+                          Time.zone.today + 3.months
                         end
 
       prediction = if predictions_by_date
-                     # Use preloaded predictions
                      predictions_by_date[prediction_date]
                    else
-                     # Query the database
                      predictions.find_by(prediction_date: prediction_date)
                    end
 
@@ -58,36 +57,65 @@ class Stock < ApplicationRecord
     recommendations
   end
 
+  def calculate_future_prediction(target_date)
+    @prediction_cache ||= {}
+    return @prediction_cache[target_date] if @prediction_cache.key?(target_date)
+
+    days_ahead = (target_date - Time.zone.today).to_i
+    if days_ahead <= 0
+      @prediction_cache[target_date] = nil
+      return nil
+    end
+
+    recent_prices = historical_prices.order(date: :desc).limit(30).pluck(:close)
+    if recent_prices.size < 2
+      Rails.logger.warn("Not enough historical data for #{symbol}.")
+      @prediction_cache[target_date] = nil
+      return nil
+    end
+
+    daily_changes = recent_prices.each_cons(2).map { |prev, curr| curr - prev }
+    average_daily_change = daily_changes.sum / daily_changes.size
+
+    if latest_price.nil?
+      Rails.logger.warn("Latest price is missing for #{symbol}.")
+      @prediction_cache[target_date] = nil
+      return nil
+    end
+
+    predicted_price = latest_price + (average_daily_change * days_ahead)
+    @prediction_cache[target_date] = predicted_price.round(2)
+  end
+
   def fetch_and_update_current_price
     fetcher = StockDataFetcher.new(symbol)
     data = fetcher.fetch_recent_data
-    if data && data.first
-      self.latest_price = data.first['price'].to_f
-      self.company_name ||= data.first['name']
+    if data && data['price']
+      self.latest_price = data['price'].to_f
+      self.company_name ||= data['name']
       save!
     else
-      Rails.logger.error "Failed to fetch recent data for #{symbol}"
+      Rails.logger.error "Failed to fetch recent data for #{symbol} or no price found."
     end
   end
 
   def latest_price
-    # Ensure you have a method or attribute that stores the latest price
     super || fetch_and_update_current_price
   end
 
-  def calculate_future_prediction(target_date)
-    days_ahead = (target_date - Time.zone.today).to_i
-    return nil if days_ahead <= 0
-
-    recent_prices = historical_prices.order(date: :desc).limit(30).pluck(:close)
-    return nil if recent_prices.size < 2
-
-    daily_changes = recent_prices.each_cons(2).map { |yesterday, today| today - yesterday }
-    average_daily_change = daily_changes.sum / daily_changes.size
-
-    predicted_price = latest_price + (average_daily_change * days_ahead)
-    predicted_price.round(2)
-  end
+  # def calculate_future_prediction(target_date)
+  #   days_ahead = (target_date - Time.zone.today).to_i
+  #   return nil if days_ahead <= 0
+  #
+  #   recent_prices = historical_prices.order(date: :desc).limit(30).pluck(:close)
+  #   return nil if recent_prices.size < 2
+  #
+  #   daily_changes = recent_prices.each_cons(2).map { |yesterday, today| today - yesterday }
+  #   average_daily_change = daily_changes.sum / daily_changes.size
+  #
+  #   predicted_price = latest_price + (average_daily_change * days_ahead)
+  #   predicted_price.round(2)
+  # end
 
   # Returns the latest prediction, utilizing preloaded associations if available
   def latest_prediction
