@@ -9,27 +9,35 @@ class FetchStockDataJob < ApplicationJob
 
       # Fetch and update the latest price
       data = fetcher.fetch_recent_data
-      if data
-        stock.update(latest_price: data[:current_price])
+      if data && data['price']
+        stock.update(latest_price: data['price'].to_f, company_name: data['name'] || stock.company_name)
       else
         Rails.logger.error "Failed to fetch recent data for #{stock.symbol}"
       end
 
       # Fetch and store historical data
-      historical_data = fetcher.fetch_historical_prices(100) # Adjust '100' as needed
-      historical_data.each do |entry|
-        stock.historical_prices.find_or_create_by(date: entry[:date]) do |hp|
-          hp.open = entry[:open]
-          hp.high = entry[:high]
-          hp.low = entry[:low]
-          hp.close = entry[:close]
-          hp.volume = entry[:volume]
+      historical_data = fetcher.fetch_historical_data # Adjust method name if needed
+      if historical_data
+        historical_data.each do |entry|
+          stock.historical_prices.find_or_create_by(date: entry['date']) do |hp|
+            hp.open = entry['open']
+            hp.high = entry['high']
+            hp.low = entry['low']
+            hp.close = entry['close']
+            hp.volume = entry['volume']
+          end
         end
+      else
+        Rails.logger.error "No historical data returned for #{stock.symbol}"
       end
 
       # Calculate moving averages and store predictions
       calculate_and_store_predictions(stock)
     end
+
+    # After updating all stocks with the latest data and predictions, update ML scores
+    # This ensures that ML scores incorporate the most recent information
+    StandardStockFetcher.new.update_ml_scores
   end
 
   private
