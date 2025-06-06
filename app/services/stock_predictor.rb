@@ -4,10 +4,11 @@ class StockPredictor
   end
 
   def moving_average(days = 5)
-    # Fetch historical prices
+    # Use fetch_historical_prices to retrieve data from the local DB, optionally calling /quote once if today's data is missing
     fetcher = StockDataFetcher.new(@stock.symbol)
-    historical_data = fetcher.fetch_historical_prices(days + 1)
-    return nil if historical_data.size < days + 1
+    historical_data = fetcher.fetch_historical_prices(@stock, days + 1)
+
+    return nil if historical_data.size < (days + 1)
 
     # Sort data by date in descending order
     sorted_data = historical_data.sort_by { |entry| entry[:date] }.reverse
@@ -19,16 +20,13 @@ class StockPredictor
       relevant_data = sorted_data[0...days]
     end
 
-    # Extract close prices using the correct key :close
     prices = relevant_data.map { |data| data[:close] }.compact
 
-    # Ensure we have enough valid prices
     if prices.size < days
       Rails.logger.error "Not enough valid close prices for #{@stock.symbol}. Required: #{days}, Available: #{prices.size}"
       return nil
     end
 
-    # Calculate average price
     average_price = prices.sum / days.to_f
 
     prediction_date = Date.today
@@ -39,12 +37,8 @@ class StockPredictor
     )
 
     prediction.predicted_price = average_price
-
-    # Set actual_price with the latest available close price
     prediction.actual_price = sorted_data.first[:close]
-
     prediction.prediction_date = Date.tomorrow
-
     prediction.save!
   end
 end

@@ -1,43 +1,27 @@
 class FetchStockDataJob < ApplicationJob
   queue_as :default
 
-  def perform(stock_id = nil)
-    stocks = stock_id ? [Stock.find(stock_id)] : Stock.all
+  def perform(stock_id)
+    stock = Stock.find(stock_id)
+    fetcher = StockDataFetcher.new(stock.symbol)
+    data = fetcher.fetch_recent_data
 
-    stocks.each do |stock|
-      fetcher = StockDataFetcher.new(stock.symbol)
+    return unless data
 
-      # Fetch and update the latest price
-      data = fetcher.fetch_recent_data
-      if data && data['price']
-        stock.update(latest_price: data['price'].to_f, company_name: data['name'] || stock.company_name)
-      else
-        Rails.logger.error "Failed to fetch recent data for #{stock.symbol}"
-      end
+    StockPrice.create!(
+      stock: stock,
+      date: Time.zone.at(data['t']).to_date,
+      open: data['o'],
+      high: data['h'],
+      low: data['l'],
+      close: data['c'],
+      volume: data['v']
+    )
 
-      # Fetch and store historical data
-      historical_data = fetcher.fetch_historical_data # Adjust method name if needed
-      if historical_data
-        historical_data.each do |entry|
-          stock.historical_prices.find_or_create_by(date: entry['date']) do |hp|
-            hp.open = entry['open']
-            hp.high = entry['high']
-            hp.low = entry['low']
-            hp.close = entry['close']
-            hp.volume = entry['volume']
-          end
-        end
-      else
-        Rails.logger.error "No historical data returned for #{stock.symbol}"
-      end
+    stock.update!(latest_price: data['c'])
 
-      # Calculate moving averages and store predictions
-      calculate_and_store_predictions(stock)
-    end
-
-    # After updating all stocks with the latest data and predictions, update ML scores
-    # This ensures that ML scores incorporate the most recent information
-    StandardStockFetcher.new.update_ml_scores
+    # Calculate predictions if we have at least some data
+    calculate_and_store_predictions(stock)
   end
 
   private
@@ -52,7 +36,8 @@ class FetchStockDataJob < ApplicationJob
     future_dates.each do |target_date|
       prediction = stock.predictions.find_or_initialize_by(prediction_date: target_date, date: Date.today)
       prediction.prediction_method = 'Moving Averages'
-      prediction.predicted_price = stock.calculate_future_prediction(target_date)
+      predicted_price = stock.calculate_future_prediction(target_date)
+      prediction.predicted_price = predicted_price || 0.0
       prediction.actual_price = nil
       prediction.save!
     end

@@ -1,8 +1,7 @@
 FactoryBot.define do
   factory :stock do
-    symbol { "AAPL" }
-    company_name { "Apple Inc." }
-    sector { "Technology" }
-    industry { "Consumer Electronics" }
+    sequence(:symbol) { |n| "STOCK#{n}" }
+    sequence(:company_name) { |n| "Company #{n}" }
+    latest_price { 100.0 }
   end
 end

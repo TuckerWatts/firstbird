@@ -9,11 +9,12 @@ Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Turn false under Spring and add config.action_view.cache_template_loading = true.
-  config.cache_classes = true
+  config.cache_classes = false
+  config.action_view.cache_template_loading = true
 
-  # Eager loading loads your whole application. When running a single test locally,
-  # this probably isn't necessary. It's a good idea to do in a continuous integration
-  # system, or in some way before deploying your code.
+  # Eager loading loads your entire application. When running a single test locally,
+  # this is usually not necessary, and can slow down your test suite. If you're running
+  # a large test suite in CI, you might want to eager load to reduce overall test time.
   config.eager_load = ENV["CI"].present?
 
   # Configure public file server for tests with Cache-Control for performance.
@@ -46,7 +47,7 @@ Rails.application.configure do
   # Print deprecation notices to the stderr.
   config.active_support.deprecation = :stderr
 
-  # Raise exceptions for disallowed deprecations.
+  # Raise exceptions for disallowed deprecations
   config.active_support.disallowed_deprecation = :raise
 
   # Tell Active Support which deprecation messages to disallow.
@@ -57,4 +58,20 @@ Rails.application.configure do
 
   # Annotate rendered view with file names.
   # config.action_view.annotate_rendered_view_with_filenames = true
+
+  # Configure default URL options for ActionMailer and ActionController
+  config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+  config.action_controller.default_url_options = { host: 'localhost', port: 3000 }
+
+  # Allow redirects to localhost in test environment
+  config.hosts.clear
+  config.hosts << 'localhost'
+  config.hosts << '127.0.0.1'
+  config.hosts << 'www.example.com'
+
+  # Configure ActiveJob to use test adapter
+  config.active_job.queue_adapter = :test
+
+  # Preserve timezone in to_time conversions
+  config.active_support.to_time_preserves_timezone = :zone
 end

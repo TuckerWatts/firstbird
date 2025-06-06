@@ -1,0 +1,30 @@
+<h3>Details for <%= @day.strftime("%Y-%m-%d") %></h3>
+<p>These are the best performing stocks for the day:</p>
+<table class="table">
+  <thead>
+    <tr>
+      <th>Symbol</th>
+      <th>Company Name</th>
+      <th>Predicted vs Actual</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @best_performers.each do |stock| %>
+      <% pred = stock.predictions.find_by(date: @day) %>
+      <% error_percent = ((pred.actual_price - pred.predicted_price).abs / pred.predicted_price * 100).round(2) %>
+      <tr>
+        <td><%= stock.symbol %></td>
+        <td><%= stock.company_name %></td>
+        <td>Actual: <%= pred.actual_price %>, Predicted: <%= pred.predicted_price %> (Error: <%= error_percent %>%)</td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<p>All successful stocks:</p>
+<ul>
+  <% @successful_stocks.each do |stock| %>
+    <% pred = stock.predictions.find_by(date: @day) %>
+    <li><%= stock.symbol %> - Actual: <%= pred.actual_price %>, Predicted: <%= pred.predicted_price %></li>
+  <% end %>
+</ul>

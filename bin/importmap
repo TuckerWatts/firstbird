@@ -1,4 +1,12 @@
 #!/usr/bin/env ruby
 
-require_relative "../config/application"
-require "importmap/commands"
+APP_PATH = File.expand_path('../config/application', __dir__)
+require_relative '../config/boot'
+require 'rails/commands'
+
+# The importmap-rails gem provides tasks like:
+#   rails importmap:pin [package]
+#   rails importmap:pin_all_from [dir]
+#   rails importmap:unpin [package]
+#   rails importmap:json
+#   rails importmap:info

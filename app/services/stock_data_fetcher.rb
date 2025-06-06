@@ -2,164 +2,168 @@ class StockDataFetcher
   include HTTParty
   base_uri 'https://finnhub.io/api/v1'
 
-  def initialize(stock_symbol)
-    @stock_symbol = stock_symbol
-    @api_key = Rails.application.credentials.dig(:finnhub, :api_key)
+  def initialize(symbol)
+    @symbol = symbol
+    @api_key = Rails.application.credentials.finnhub[:api_key]
   end
 
   def fetch_recent_data
-    response = self.class.get('/quote', query: {
-      symbol: @stock_symbol,
-      token: @api_key
-    })
+    Rails.cache.fetch("stock_data/#{@symbol}/recent", expires_in: 5.minutes) do
+      response = self.class.get("/quote", query: {
+        symbol: @symbol,
+        token: @api_key
+      })
 
-    parsed_response = response.parsed_response
+      return nil unless response.success? && response.parsed_response['c'].present?
 
-    if response.success? && parsed_response.is_a?(Hash) && parsed_response['c']
-      # 'c' = current price, 'h' = high, 'l' = low, 'o' = open, 'pc' = previous close
-      {
-        'symbol' => @stock_symbol,
-        'price' => parsed_response['c'].to_f,
-        'name' => @stock_symbol, # Finnhub doesn't provide name here; consider another endpoint or cached value.
-        'high' => parsed_response['h'].to_f,
-        'low' => parsed_response['l'].to_f,
-        'open' => parsed_response['o'].to_f,
-        'previous_close' => parsed_response['pc'].to_f
-      }
-    else
-      error_message = parsed_response.is_a?(Hash) && parsed_response['error'] ? parsed_response['error'] : "Invalid response format"
-      Rails.logger.error "Failed to fetch recent data for #{@stock_symbol}: #{error_message}"
-      nil
+      response.parsed_response
     end
   end
 
-  def fetch_historical_data
-    # Fetch 1 year of daily data as an example
-    to = Time.now.to_i
-    from = (Time.now - 365 * 24 * 60 * 60).to_i
+  def fetch_historical_data(from_date, to_date)
+    cache_key = "stock_data/#{@symbol}/historical/#{from_date.to_date}/#{to_date.to_date}"
+    
+    Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+      response = self.class.get("/stock/candle", query: {
+        symbol: @symbol,
+        from: from_date.to_time.to_i,
+        to: to_date.to_time.to_i,
+        resolution: 'D',
+        token: @api_key
+      })
 
-    response = self.class.get('/stock/candle', query: {
-      symbol: @stock_symbol,
-      resolution: 'D',
-      from: from,
-      to: to,
-      token: @api_key
-    })
+      return nil unless response.success? && response.parsed_response['c'].present?
 
-    parsed_response = response.parsed_response
+      process_historical_data(response.parsed_response)
+    end
+  end
 
-    if response.success? && parsed_response.is_a?(Hash) && parsed_response['s'] == 'ok'
-      timestamps = parsed_response['t']
-      opens = parsed_response['o']
-      highs = parsed_response['h']
-      lows = parsed_response['l']
-      closes = parsed_response['c']
-      volumes = parsed_response['v']
+  def fetch_historical_prices(stock, days)
+    # We need days+1 entries (including potentially today's data)
+    required_count = days + 1
 
-      timestamps.each_with_index.map do |timestamp, i|
+    # Check local historical_prices first
+    prices = stock.historical_prices.order(date: :desc).limit(required_count).map do |hp|
+      {
+        date: hp.date,
+        open: hp.open,
+        high: hp.high,
+        low: hp.low,
+        close: hp.close,
+        volume: hp.volume
+      }
+    end
+
+    # If we don't have enough data and we haven't recorded today's price, try fetching today's data once.
+    if prices.size < required_count
+      # Check if we have today's record
+      if !stock.historical_prices.exists?(date: Date.today)
+        # Fetch today's price once
+        data = fetch_recent_data
+        if data && data['price']
+          stock.historical_prices.create!(
+            date: Date.today,
+            open: data['open'] || data['price'],
+            high: data['high'] || data['price'],
+            low: data['low'] || data['price'],
+            close: data['price'],
+            volume: 0
+          )
+        else
+          Rails.logger.error "Could not fetch today's price for #{@symbol}, no additional data stored."
+        end
+      end
+
+      # Requery after attempting to add today's data
+      prices = stock.historical_prices.order(date: :desc).limit(required_count).map do |hp|
         {
-          'date' => Time.at(timestamp).to_date,
-          'open' => opens[i].to_f,
-          'high' => highs[i].to_f,
-          'low' => lows[i].to_f,
-          'close' => closes[i].to_f,
-          'volume' => volumes[i].to_i
+          date: hp.date,
+          open: hp.open,
+          high: hp.high,
+          low: hp.low,
+          close: hp.close,
+          volume: hp.volume
         }
       end
-    else
-      error_message = parsed_response.is_a?(Hash) && parsed_response['error'] ? parsed_response['error'] : "Invalid response format or s != ok"
-      Rails.logger.error "Failed to fetch historical data for #{@stock_symbol}: #{error_message}"
-      nil
     end
+
+    prices
   end
 
-  def update_ml_scores
+  def self.update_ml_scores
     # Fetch all stocks
-    stocks = Stock.includes(:historical_prices, :predictions).to_a
+    stocks = Stock.includes(:historical_prices).to_a
 
-    # Ensure we have the necessary data for calculations
-    # For example, ensure historical_prices and latest_price are present
+    # Ensure minimal data presence (latest_price)
     stocks.each do |stock|
       if stock.latest_price.nil?
         stock.fetch_and_update_current_price rescue nil
       end
-      if stock.historical_prices.empty?
-        stock.fetch_and_update_historical_prices rescue nil
-      end
     end
 
-    # Compute ml_score for each stock using a more meaningful heuristic
+    # Compute ml_score for each stock using what data we have
     stocks.each do |stock|
       ml_score = compute_ml_score_for(stock)
       stock.update!(ml_score: ml_score)
     end
   end
 
-  private
-
-  private
-
-  def compute_ml_score_for(stock)
-    # Calculate volatility from recent historical prices
+  def self.compute_ml_score_for(stock)
     volatility = calculate_volatility(stock)
-
-    # Calculate short-term predicted growth (e.g., 1 week ahead)
     timeframe = Time.zone.today + 7.days
     predicted_growth = calculate_predicted_growth(stock, timeframe)
 
-    # Combine both into a final score
-    # Start with a baseline of 1.0
-    # Adjust by volatility factor and predicted growth factor
-    # Just a simple formula for demonstration:
     base_score = 1.0
-    # Increase score by (volatility_factor - 1.0) to shift it around baseline
-    # volatility_factor is mapped from volatility (0.0 to high) to a range around [0.5..1.5]
     volatility_factor = map_volatility_to_range(volatility, 0.0, 5.0, 0.5, 1.5)
-
-    # predicted_growth is a percentage (e.g., if predicted to grow 10%, predicted_growth = 10.0)
-    # We convert that into a small bonus: e.g., add (predicted_growth / 100 * 0.5)
-    # so a 10% predicted growth adds 0.05 to the score.
     growth_bonus = (predicted_growth / 100.0) * 0.5
 
-    # Final score
     ml_score = base_score * volatility_factor + growth_bonus
-
-    # Clamp ml_score between 0.5 and 1.5 to avoid extreme values
-    ml_score = ml_score.clamp(0.5, 1.5)
-
-    ml_score
+    ml_score.clamp(0.5, 1.5)
   end
 
-  def calculate_volatility(stock)
+  def self.calculate_volatility(stock)
     closes = stock.historical_prices.order(date: :desc).limit(30).pluck(:close)
     return 0.0 if closes.size < 2
 
     daily_returns = closes.each_cons(2).map { |y, t| ((t - y) / y) * 100.0 }
     mean = daily_returns.sum / daily_returns.size
     variance = daily_returns.map { |r| (r - mean)**2 }.sum / daily_returns.size
-    stddev = Math.sqrt(variance)
-    stddev
+    Math.sqrt(variance)
   end
 
-  def calculate_predicted_growth(stock, timeframe)
+  def self.calculate_predicted_growth(stock, timeframe)
     predicted_price = stock.calculate_future_prediction(timeframe)
     return 0.0 if predicted_price.nil? || stock.latest_price.nil?
 
     ((predicted_price - stock.latest_price) / stock.latest_price) * 100.0
   end
 
-  def map_volatility_to_range(value, old_min, old_max, new_min, new_max)
-    # If no volatility or only one data point, return baseline
+  def self.map_volatility_to_range(value, old_min, old_max, new_min, new_max)
     return new_min if old_max == old_min
 
-    # Normalize value within old_min to old_max and scale to new range
     ratio = (value - old_min) / (old_max - old_min)
     new_value = new_min + ratio * (new_max - new_min)
+    new_value.clamp(new_min, new_max)
+  end
 
-    # If volatility is low, new_value ~ new_min (0.5)
-    # If volatility is high, new_value ~ new_max (1.5)
-    # For large volatility, cap at new_max
-    new_value = new_value.clamp(new_min, new_max)
-    new_value
+  def self.fetch_multiple_stocks(symbols)
+    symbols.each_slice(10) do |batch|
+      batch.each do |symbol|
+        new(symbol).fetch_recent_data
+      end
+      sleep(0.5) # Rate limiting
+    end
+  end
+
+  private
+
+  def process_historical_data(data)
+    {
+      'dates' => data['t'],
+      'prices' => data['c'],
+      'volumes' => data['v'],
+      'highs' => data['h'],
+      'lows' => data['l']
+    }
   end
 end

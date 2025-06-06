@@ -1,0 +1,3 @@
+<%= turbo_stream.replace "day_details_frame" do %>
+  <%= render partial: "day_details", locals: { day: @day, best_performers: @best_performers, successful_stocks: @successful_stocks } %>
+<% end %>

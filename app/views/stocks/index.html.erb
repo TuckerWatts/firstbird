@@ -1,96 +1,221 @@
-<h1>Stocks</h1>
+<!-- app/views/stocks/index.html.erb -->
 
-<% if notice %>
-  <p class="alert alert-success"><%= notice %></p>
-<% end %>
-
-<%= link_to 'Home', root_path, class: 'btn btn-secondary' %>
-
-<% if user_signed_in? && current_user.admin? %>
-  <%= button_to 'Fetch Data', fetch_data_path, method: :post, class: 'btn btn-primary' %>
-  <%= button_to 'Refresh Top Stocks', refresh_top_stocks_stocks_path, method: :post, class: 'btn btn-primary' %>
-<% end %>
-
-<h2>Top Stocks with Favorable Call Option Recommendations</h2>
-
-<% if notice %>
-  <div class="alert alert-success"><%= notice %></div>
-<% end %>
-
-<% if alert %>
-  <div class="alert alert-danger"><%= alert %></div>
-<% end %>
-
-<% if @top_stocks.present? %>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Symbol</th>
-        <th>Company Name</th>
-        <th>Favorable Timeframes</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @top_stocks.each do |stock| %>
-        <% timeframes = ['1 Week', '1 Month', '3 Months'] %>
-        <% recommendations = stock.call_option_recommendations(timeframes) %>
-        <% favorable_timeframes = recommendations.select { |_, advisable| advisable }.keys.join(', ') %>
-        <tr>
-          <td><%= link_to stock.symbol, stock_path(stock) %></td>
-          <td><%= stock.company_name %></td>
-          <td><%= favorable_timeframes.presence || 'None' %></td>
-        </tr>
+<div class="container-fluid py-4">
+  <!-- Header & Admin Controls -->
+  <div class="sm:flex sm:items-center sm:justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-900">Stocks Dashboard</h1>
+      <p class="mt-1 text-sm text-gray-500">Monitor and analyze stock performance and predictions</p>
+    </div>
+    <div class="mt-4 sm:mt-0 sm:flex sm:space-x-3">
+      <%= link_to 'Home', root_path, class: 'inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50' %>
+      <%= link_to 'New Stock', new_stock_path, class: 'inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600' %>
+      <% if user_signed_in? && current_user.admin? %>
+        <%= button_to 'Fetch Data', fetch_data_path, method: :post, class: 'inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600' %>
+        <%= button_to 'Refresh Top Stocks', refresh_top_stocks_stocks_path, method: :post, class: 'inline-flex items-center rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-600' %>
       <% end %>
-    </tbody>
-  </table>
-<% else %>
-  <p>No top stocks available at the moment.</p>
-<% end %>
+    </div>
+  </div>
 
-<table class="table">
-  <thead>
-    <tr>
-      <th>Symbol</th>
-      <th>Company Name</th>
-      <th>Predicted Price</th>
-      <th>Actual Price</th>
-      <th>Prediction Success</th>
-      <th>Call Option Recommendation</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% @stocks.each do |stock| %>
-      <% recommendations = stock.call_option_recommendations %>
-      <% best_timeframe = recommendations.select { |_, advisable| advisable }.keys.first %>
-      <tr>
-        <td><%= link_to stock.symbol, stock_path(stock) %></td>
-        <td><%= stock.company_name %></td>
-        <% if stock.latest_prediction %>
-          <td><%= number_to_currency(stock.latest_prediction.predicted_price) %></td>
-          <td><%= number_to_currency(stock.latest_prediction.actual_price) %></td>
-          <td>
-            <% case stock.last_prediction_successful? %>
-            <% when true %>
-              <span class="text-success">Successful</span>
-            <% when false %>
-              <span class="text-danger">Unsuccessful</span>
-            <% else %>
-              <span class="text-warning">Insufficient Data</span>
-            <% end %>
-          </td>
-        <% else %>
-          <td colspan="3">No prediction data available</td>
-        <% end %>
-        <td>
-          <% if best_timeframe %>
-            <span class="text-success">
-              Buy call option for <%= best_timeframe %>
-            </span>
-          <% else %>
-            <span class="text-danger">No favorable timeframes currently</span>
+  <% if notice.present? %>
+    <div class="alert alert-success" role="alert">
+      <%= notice %>
+    </div>
+  <% end %>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+    <!-- Total Top Stocks -->
+    <div class="relative overflow-hidden rounded-lg bg-white px-4 pb-12 pt-5 shadow sm:px-6 sm:pt-6">
+      <dt>
+        <div class="absolute rounded-md bg-indigo-500 p-3">
+          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        </div>
+        <p class="ml-16 truncate text-sm font-medium text-gray-500">Total Top Stocks</p>
+      </dt>
+      <dd class="ml-16 flex items-baseline pb-6 sm:pb-7">
+        <p class="text-2xl font-semibold text-gray-900" id="top-stocks-count">0</p>
+      </dd>
+    </div>
+
+    <!-- Desired Stocks -->
+    <div class="relative overflow-hidden rounded-lg bg-white px-4 pb-12 pt-5 shadow sm:px-6 sm:pt-6">
+      <dt>
+        <div class="absolute rounded-md bg-green-500 p-3">
+          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p class="ml-16 truncate text-sm font-medium text-gray-500">Desired Stocks</p>
+      </dt>
+      <dd class="ml-16 flex items-baseline pb-6 sm:pb-7">
+        <p class="text-2xl font-semibold text-gray-900" id="desired-stocks-count">0</p>
+      </dd>
+    </div>
+
+    <!-- Success Rate -->
+    <div class="relative overflow-hidden rounded-lg bg-white px-4 pb-12 pt-5 shadow sm:px-6 sm:pt-6">
+      <dt>
+        <div class="absolute rounded-md bg-blue-500 p-3">
+          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <p class="ml-16 truncate text-sm font-medium text-gray-500">30-Day Success Rate</p>
+      </dt>
+      <dd class="ml-16 flex items-baseline pb-6 sm:pb-7">
+        <p class="text-2xl font-semibold text-gray-900" id="success-rate">--</p>
+      </dd>
+    </div>
+
+    <!-- Average ML Score -->
+    <div class="relative overflow-hidden rounded-lg bg-white px-4 pb-12 pt-5 shadow sm:px-6 sm:pt-6">
+      <dt>
+        <div class="absolute rounded-md bg-purple-500 p-3">
+          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+        </div>
+        <p class="ml-16 truncate text-sm font-medium text-gray-500">Average ML Score</p>
+      </dt>
+      <dd class="ml-16 flex items-baseline pb-6 sm:pb-7">
+        <p class="text-2xl font-semibold text-gray-900" id="avg-ml-score">--</p>
+      </dd>
+    </div>
+  </div>
+
+  <!-- Daily Success Chart -->
+  <%= turbo_frame_tag "historical_data", src: historical_data_stocks_path, loading: "lazy" do %>
+    <div class="bg-white shadow rounded-lg mb-8">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-base font-semibold leading-6 text-gray-900">Daily Prediction Success (Last 30 Days)</h3>
+        <div class="mt-2 max-w-xl text-sm text-gray-500">
+          <p>Loading historical success data...</p>
+        </div>
+        <div class="animate-pulse mt-5 h-96 bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Tabs -->
+  <div data-controller="tabs" class="mt-8">
+    <div class="sm:hidden">
+      <label for="tabs" class="sr-only">Select a tab</label>
+      <select id="tabs" name="tabs" class="block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" data-tabs-target="select" data-action="change->tabs#selectChange">
+        <option selected>Top Stocks</option>
+        <option>Desired Stocks</option>
+        <option>Predictions</option>
+      </select>
+    </div>
+    <div class="hidden sm:block">
+      <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+          <button data-tabs-target="tab" data-action="click->tabs#switch" class="border-indigo-500 text-indigo-600 whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium" aria-current="page">Top Stocks</button>
+          <button data-tabs-target="tab" data-action="click->tabs#switch" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium">Desired Stocks</button>
+          <button data-tabs-target="tab" data-action="click->tabs#switch" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium">Predictions</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Tab Panes -->
+    <div class="mt-8">
+      <!-- Top Stocks Pane -->
+      <div data-tabs-target="panel" class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+          <%= turbo_frame_tag "top_stocks", src: top_stocks_stocks_path, loading: "lazy" do %>
+            <div class="animate-pulse">
+              <div class="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+            </div>
           <% end %>
-        </td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+        </div>
+      </div>
+
+      <!-- Desired Stocks Pane -->
+      <div data-tabs-target="panel" class="hidden bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+          <%= turbo_frame_tag "desired_stocks", src: desired_stocks_stocks_path, loading: "lazy" do %>
+            <div class="animate-pulse">
+              <div class="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Predictions Pane -->
+      <div data-tabs-target="panel" class="hidden bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+          <%= turbo_frame_tag "stock_predictions", src: stock_predictions_stocks_path, loading: "lazy" do %>
+            <div class="animate-pulse">
+              <div class="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+              <div class="h-8 bg-gray-200 rounded w-full mb-2"></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Daily Success Table -->
+  <div class="card border-0 shadow-sm my-5">
+    <div class="card-header bg-info text-white">
+      <h2 class="h5 mb-0">Daily Prediction Success Details</h2>
+    </div>
+    <div class="card-body">
+      <p class="mb-4 text-muted">
+        Drill down into each day's performance data will load with historical data.
+      </p>
+    </div>
+  </div>
+</div>
+
+<%= javascript_tag do %>
+  document.addEventListener("turbo:load", function() {
+    // Update counters when frames load
+    document.addEventListener("turbo:frame-load", function(event) {
+      const frame = event.target;
+      
+      if (frame.id === "top_stocks") {
+        const count = frame.querySelectorAll("tbody tr").length;
+        const countElement = document.getElementById("top-stocks-count");
+        if (countElement) countElement.textContent = count;
+      }
+      
+      if (frame.id === "desired_stocks") {
+        const count = frame.querySelectorAll("tbody tr").length;
+        const countElement = document.getElementById("desired-stocks-count");
+        if (countElement) countElement.textContent = count;
+      }
+      
+      if (frame.id === "historical_data") {
+        // Update success rate from historical data
+        const successRateElement = document.getElementById("success-rate");
+        if (successRateElement && window.historicalSuccessRate !== undefined) {
+          successRateElement.textContent = window.historicalSuccessRate.toFixed(2) + "%";
+        }
+      }
+      
+      if (frame.id === "stock_predictions") {
+        // Calculate and update average ML score
+        const mlScores = Array.from(frame.querySelectorAll("[data-ml-score]"))
+          .map(el => parseFloat(el.dataset.mlScore))
+          .filter(score => !isNaN(score));
+          
+        if (mlScores.length > 0) {
+          const avgScore = mlScores.reduce((sum, score) => sum + score, 0) / mlScores.length;
+          const avgScoreElement = document.getElementById("avg-ml-score");
+          if (avgScoreElement) avgScoreElement.textContent = avgScore.toFixed(2);
+        }
+      }
+    });
+  });
+<% end %>

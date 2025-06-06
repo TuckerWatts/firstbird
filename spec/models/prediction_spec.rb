@@ -1,7 +1,10 @@
 require 'rails_helper'
 
 RSpec.describe Prediction, type: :model do
-  let(:stock) { Stock.create!(name: 'Test Stock', symbol: 'TST') }
+  let(:stock) { Stock.create!(company_name: 'Test Stock', symbol: 'TST') }
+  let(:prediction_date) { Date.today }
+  let(:predicted_price) { 115.0 }
+  let(:actual_price) { 110.0 }
 
   describe 'attributes' do
     it 'has an actual_price attribute' do
@@ -11,47 +14,46 @@ RSpec.describe Prediction, type: :model do
   end
 
   describe '#prediction_successful?' do
-    before do
-      # Create previous prediction with actual_price
-      @previous_prediction = Prediction.create!(
-        stock: stock,
-        date: Date.yesterday,
-        predicted_price: 100.0,
-        actual_price: 105.0
-      )
+    context 'when actual_price is available' do
+      let!(:prediction) do
+        Prediction.create!(
+          stock: stock,
+          prediction_date: prediction_date,
+          predicted_price: predicted_price,
+          actual_price: actual_price
+        )
+      end
 
-      # Create current prediction
-      @prediction = Prediction.create!(
-        stock: stock,
-        date: Date.today,
-        predicted_price: 110.0,
-        actual_price: 115.0
-      )
-    end
+      let!(:historical_price) do
+        HistoricalPrice.create!(
+          stock: stock,
+          date: prediction_date,
+          close: 100.0
+        )
+      end
 
-    context 'when previous actual_price is available' do
       it 'returns true if predicted and actual directions match' do
-        expect(@prediction_successful).to be true
+        expect(prediction.prediction_successful?).to be true
       end
 
       it 'returns false if predicted and actual directions do not match' do
-        # Simulate an incorrect prediction
-        @prediction.update(actual_price: 95.0)
-        expect(@prediction_successful).to be false
-      end
-    end
-
-    context 'when previous actual_price is missing' do
-      it 'returns nil' do
-        @previous_prediction.update(actual_price: nil)
-        expect(@prediction_successful).to be_nil
+        prediction.update(predicted_price: 90.0)
+        expect(prediction.prediction_successful?).to be false
       end
     end
 
     context 'when actual_price is missing' do
+      let!(:prediction) do
+        Prediction.create!(
+          stock: stock,
+          prediction_date: prediction_date,
+          predicted_price: predicted_price,
+          actual_price: nil
+        )
+      end
+
       it 'returns nil' do
-        @prediction.update(actual_price: nil)
-        expect(@prediction_successful).to be_nil
+        expect(prediction.prediction_successful?).to be_nil
       end
     end
   end

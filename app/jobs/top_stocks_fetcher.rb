@@ -5,7 +5,7 @@ class TopStocksFetcher
 
   def fetch_top_meme_stocks
     timeframe = Time.zone.today + 7.days  # Short-term prediction: 1 week
-    all_stocks = Stock.includes(:historical_prices, :predictions).to_a
+    all_stocks = Stock.includes(:historical_prices).to_a
 
     # Ensure data is up-to-date for each stock
     all_stocks.each do |stock|

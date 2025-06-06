@@ -1,0 +1,117 @@
+<div class="bg-white shadow rounded-lg mb-8">
+  <div class="px-4 py-5 sm:p-6">
+    <h3 class="text-base font-semibold leading-6 text-gray-900">Daily Prediction Success (Last 30 Days)</h3>
+    <div class="mt-2 max-w-xl text-sm text-gray-500">
+      <p>Interact with the chart to view success rates per day.</p>
+    </div>
+    <div class="mt-5 h-96" data-controller="daily-success-chart">
+      <canvas data-daily-success-chart-target="canvas"
+              data-daily-success-chart-values="<%= @historical_success.map { |day| day[:rate] }.to_json %>"
+              data-daily-success-chart-labels="<%= @historical_success.map { |day| day[:date].strftime("%Y-%m-%d") }.to_json %>"
+              aria-label="Daily success chart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm my-5">
+  <div class="card-header bg-info text-white">
+    <h2 class="h5 mb-0">Daily Prediction Success Details</h2>
+  </div>
+  <div class="card-body">
+    <p class="mb-4 text-muted">
+      Drill down into each day's performance, compare with the benchmark, and view underlying data.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-hover table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Success Rate</th>
+            <th>Benchmark Rate</th>
+            <th>Trend</th>
+            <th>Error Distribution</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% previous_rate = nil %>
+          <% @historical_success.reverse_each do |day_data| %>
+            <% success_rate      = day_data[:rate] ? day_data[:rate] / 100.0 : 0 %>
+            <% benchmark_rate    = day_data[:benchmark_rate] ? day_data[:benchmark_rate] / 100.0 : 0 %>
+            <% error_distribution = day_data[:error_distribution] || {} %>
+            <% total             = day_data[:total] %>
+            <% success           = day_data[:successful] %>
+
+            <% trend = if previous_rate.nil?
+                         '–'
+                       elsif success_rate > previous_rate
+                         '↑'
+                       elsif success_rate < previous_rate
+                         '↓'
+                       else
+                         '→'
+                       end
+            %>
+            <% previous_rate = success_rate %>
+
+            <% success_percentage   = (success_rate * 100).round(2) %>
+            <% benchmark_percentage = (benchmark_rate * 100).round(2) %>
+
+            <% row_class = if success_rate < 0.31
+                             'table-danger'
+                           elsif success_rate < 0.70
+                             'table-warning'
+                           else
+                             'table-success'
+                           end
+            %>
+
+            <tr class="<%= row_class %>">
+              <td class="fw-semibold">
+                <%= day_data[:date].strftime("%Y-%m-%d") %>
+              </td>
+              <td>
+                <%= "#{success_percentage}% (#{success}/#{total})" %>
+              </td>
+              <td><%= "#{benchmark_percentage}%" %></td>
+              <td><%= trend %></td>
+              <td>
+                <% if error_distribution.is_a?(Hash) && error_distribution.any? %>
+                  Low: <%= error_distribution[:low] || 0 %>, 
+                  Med: <%= error_distribution[:medium] || 0 %>, 
+                  High: <%= error_distribution[:high] || 0 %>
+                <% else %>
+                  N/A
+                <% end %>
+              </td>
+              <td>
+                <%= link_to 'View Details',
+                    day_details_stocks_path(date: day_data[:date]),
+                    data: { turbo_frame: "day_details_frame" },
+                    class: "btn btn-sm btn-info" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <%= turbo_frame_tag "day_details_frame" do %>
+      <!-- Day details load here via Turbo if needed -->
+    <% end %>
+  </div>
+</div>
+
+<% # Calculate overall success rate and make it available to JavaScript %>
+<% overall_rate = if @historical_success.present?
+                    success_sum = @historical_success.sum { |d| d[:successful] }
+                    total_sum   = @historical_success.sum { |d| d[:total] }
+                    total_sum.positive? ? (success_sum.to_f / total_sum) * 100 : 0
+                  else
+                    0
+                  end
+%>
+
+<script>
+  window.historicalSuccessRate = <%= overall_rate.round(2) %>;
+</script> 

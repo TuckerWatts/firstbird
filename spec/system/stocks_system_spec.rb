@@ -1,50 +1,58 @@
 require 'rails_helper'
 
-RSpec.feature 'Stocks', type: :feature do
-  let(:stock) { Stock.create!(name: 'Test Stock', symbol: 'TST') }
-
-  scenario 'User views stock with successful prediction' do
-    # Create predictions
-    Prediction.create!(
-      stock: stock,
-      date: Date.yesterday,
-      predicted_price: 100.0,
-      actual_price: 105.0
-    )
-
-    visit stock_path(stock)
-
-    expect(page).to have_content('The prediction was successful!')
-    expect(page).to have_css('.text-success')
+RSpec.describe "Stocks", type: :system do
+  let(:user) { create(:user) }
+  let(:api_response) do
+    {
+      'c' => 150.0,
+      'h' => 155.0,
+      'l' => 145.0,
+      'o' => 148.0,
+      't' => Time.current.to_i,
+      'v' => 1000000
+    }
   end
 
-  scenario 'User views stock with unsuccessful prediction' do
-    # Create predictions
-    Prediction.create!(
-      stock: stock,
-      date: Date.yesterday,
-      predicted_price: 100.0,
-      actual_price: 95.0
+  before do
+    driven_by(:rack_test)
+    sign_in user
+    stub_request(:get, /api.finnhub.io/).to_return(
+      status: 200,
+      body: api_response.to_json,
+      headers: { 'Content-Type' => 'application/json' }
     )
-
-    visit stock_path(stock)
-
-    expect(page).to have_content('The prediction was not successful.')
-    expect(page).to have_css('.text-danger')
   end
 
-  scenario 'User views stock without actual price' do
-    # Create prediction without actual_price
-    Prediction.create!(
-      stock: stock,
-      date: Date.yesterday,
-      predicted_price: 100.0,
-      actual_price: nil
-    )
-
+  it "User views stock with successful prediction" do
+    stock = create(:stock)
+    prediction = create(:prediction, stock: stock, predicted_price: 160.0, actual_price: 165.0)
+    
     visit stock_path(stock)
+    
+    expect(page).to have_content(stock.company_name)
+    expect(page).to have_content(stock.symbol)
+    expect(page).to have_content("Prediction was successful")
+  end
 
-    expect(page).to have_content('Cannot determine prediction success yet.')
-    expect(page).to have_css('.text-warning')
+  it "User views stock with unsuccessful prediction" do
+    stock = create(:stock)
+    prediction = create(:prediction, stock: stock, predicted_price: 160.0, actual_price: 145.0)
+    
+    visit stock_path(stock)
+    
+    expect(page).to have_content(stock.company_name)
+    expect(page).to have_content(stock.symbol)
+    expect(page).to have_content("Prediction was not successful")
+  end
+
+  it "User views stock without actual price" do
+    stock = create(:stock)
+    prediction = create(:prediction, stock: stock, predicted_price: 160.0, actual_price: nil)
+    
+    visit stock_path(stock)
+    
+    expect(page).to have_content(stock.company_name)
+    expect(page).to have_content(stock.symbol)
+    expect(page).to have_content("Prediction result pending")
   end
 end

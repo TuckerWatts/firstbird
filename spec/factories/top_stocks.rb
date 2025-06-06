@@ -1,5 +1,5 @@
 FactoryBot.define do
   factory :top_stock do
-    stock { nil }
+    stock
   end
 end

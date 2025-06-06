@@ -10,9 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2024_12_19_181118) do
+ActiveRecord::Schema[8.0].define(version: 2025_03_21_180016) do
   # These are extensions that must be enabled in order to support this database
-  enable_extension "plpgsql"
+  enable_extension "pg_catalog.plpgsql"
+
+  create_table "desired_stocks", force: :cascade do |t|
+    t.bigint "stock_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["stock_id"], name: "index_desired_stocks_on_stock_id"
+  end
 
   create_table "historical_prices", force: :cascade do |t|
     t.bigint "stock_id", null: false
@@ -40,7 +47,33 @@ ActiveRecord::Schema[7.0].define(version: 2024_12_19_181118) do
     t.decimal "ma_10"
     t.decimal "ma_20"
     t.date "prediction_date"
+    t.index ["stock_id", "prediction_date"], name: "index_predictions_on_stock_id_and_prediction_date"
     t.index ["stock_id"], name: "index_predictions_on_stock_id"
+  end
+
+  create_table "stock_analyses", force: :cascade do |t|
+    t.date "date"
+    t.decimal "sentiment_score"
+    t.decimal "technical_score"
+    t.decimal "overall_score"
+    t.bigint "stock_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["stock_id"], name: "index_stock_analyses_on_stock_id"
+  end
+
+  create_table "stock_prices", force: :cascade do |t|
+    t.date "date"
+    t.decimal "open"
+    t.decimal "high"
+    t.decimal "low"
+    t.decimal "close"
+    t.integer "volume"
+    t.bigint "stock_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["stock_id", "date"], name: "index_stock_prices_on_stock_id_and_date"
+    t.index ["stock_id"], name: "index_stock_prices_on_stock_id"
   end
 
   create_table "stocks", force: :cascade do |t|
@@ -52,6 +85,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_12_19_181118) do
     t.datetime "updated_at", null: false
     t.decimal "latest_price"
     t.decimal "ml_score"
+    t.index ["symbol"], name: "index_stocks_on_symbol", unique: true
   end
 
   create_table "top_stocks", force: :cascade do |t|
@@ -74,7 +108,10 @@ ActiveRecord::Schema[7.0].define(version: 2024_12_19_181118) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "desired_stocks", "stocks"
   add_foreign_key "historical_prices", "stocks"
   add_foreign_key "predictions", "stocks"
+  add_foreign_key "stock_analyses", "stocks"
+  add_foreign_key "stock_prices", "stocks"
   add_foreign_key "top_stocks", "stocks"
 end
