@@ -4,11 +4,11 @@
   <p class="alert alert-success"><%= notice %></p>
 <% end %>
 
-<%= link_to 'Home', root_path, class: 'btn btn-secondary' %>
+<%= link_to 'Home', root_path, class: 'btn-fun' %>
 
 <% if user_signed_in? && current_user.admin? %>
-  <%= button_to 'Fetch Data', fetch_data_path, method: :post, class: 'btn btn-primary' %>
-  <%= button_to 'Refresh Top Stocks', refresh_top_stocks_stocks_path, method: :post, class: 'btn btn-primary' %>
+  <%= button_to 'Fetch Data', fetch_data_path, method: :post, class: 'btn-fun' %>
+  <%= button_to 'Refresh Top Stocks', refresh_top_stocks_stocks_path, method: :post, class: 'btn-fun' %>
 <% end %>
 
 <h2>Top Stocks with Favorable Call Option Recommendations</h2>
@@ -22,7 +22,7 @@
 <% end %>
 
 <% if @top_stocks.present? %>
-  <table class="table">
+  <table class="table table-striped">
     <thead>
       <tr>
         <th>Symbol</th>
@@ -47,7 +47,7 @@
   <p>No top stocks available at the moment.</p>
 <% end %>
 
-<table class="table">
+<table class="table table-striped">
   <thead>
     <tr>
       <th>Symbol</th>

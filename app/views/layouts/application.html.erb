@@ -11,7 +11,10 @@
   </head>
 
   <body>
-    <main class="container mx-auto mt-28 px-5 flex">
+    <header class="fun-header">
+      <h1>Firstbird</h1>
+    </header>
+    <main class="container mx-auto mt-10 px-5 flex flex-col gap-4">
       <%= yield %>
 
       <% if user_signed_in? %>
